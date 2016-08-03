@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -11,9 +12,10 @@ import (
 )
 
 type Dmoz struct {
-	Cateid string   `json:"cateid"`
-	Topic  string   `json:"topic"`
-	Link   []string `json:"link"`
+	Cateid        string   `json:"cateid"`
+	Topic         string   `json:"topic"`
+	Link          []string `json:"link"`
+	GeneratedDate string   `json:"generated_date"`
 }
 
 func main() {
@@ -21,7 +23,7 @@ func main() {
 	var obj Dmoz
 	starttime := time.Now()
 	//open file
-	if file, err := os.Open("/tmp/dmoz/content.rdf.u8"); err == nil {
+	if file, err := os.Open("/tmp/content.rdf.u8"); err == nil {
 		//make sure if gets closed
 		defer file.Close()
 
@@ -29,13 +31,24 @@ func main() {
 		catid := ""
 		var links []string
 		var isTopic bool
-
+		var timestamp string
 		//create a new scanner and read the file line by line
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			txt := scanner.Text()
 			txt = strings.Trim(txt, " ")
 			txt = strings.ToLower(txt)
+
+			if strings.Index(txt, "<!-- generated at") == 0 {
+				timetxt := strings.TrimPrefix(txt, "<!-- generated at ")
+				timetxt = strings.TrimSuffix(timetxt, " est from dmoz 2.0 -->")
+				targ := fmt.Sprintf("%s-04:00", timetxt)
+				t, err := time.Parse("2006-01-02 15:04:05-07:00 ", targ)
+				if err != nil {
+					fmt.Println(err)
+				}
+				timestamp = t.Format(time.RFC3339)
+			}
 
 			if strings.Index(txt, "<topic r:id=") == 0 {
 				topictxt = strings.TrimPrefix(txt, "<topic r:id=\"")
@@ -63,6 +76,7 @@ func main() {
 			if strings.Index(txt, "</topic>") == 0 {
 				isTopic = false
 				obj.Link = links
+				obj.GeneratedDate = timestamp
 				//log.Println(obj)
 				dmozs = append(dmozs, obj)
 				topictxt = ""
